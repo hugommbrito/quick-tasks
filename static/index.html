@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quick Tasks</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+  <style>
+    body { background: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .sortable-ghost { opacity: 0.35; }
+    .sortable-drag { opacity: 1; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+    .column-scroll { max-height: calc(100vh - 160px); overflow-y: auto; }
+    @media (max-width: 768px) { .column-scroll { max-height: none; } }
+    .badge-urgent { background:#fee2e2; color:#b91c1c; }
+    .badge-important { background:#fef3c7; color:#b45309; }
+    .status-dot-todo { background:#94a3b8; }
+    .status-dot-doing { background:#f59e0b; }
+    .status-dot-waiting { background:#a855f7; }
+    .status-dot-done { background:#22c55e; }
+    .task-card { cursor: grab; }
+    .task-card:active { cursor: grabbing; }
+    input[type=checkbox] { accent-color: #6366f1; }
+    .modal-backdrop { background: rgba(0,0,0,0.4); backdrop-filter: blur(2px); }
+    textarea { resize: vertical; }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+<!-- HEADER -->
+<header class="bg-white shadow-sm sticky top-0 z-10">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <span class="text-2xl">⚡</span>
+      <h1 class="text-xl font-bold text-slate-800">Quick Tasks</h1>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="autoOrder()" class="border border-slate-300 text-slate-600 hover:bg-slate-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+        ↕ Auto Order
+      </button>
+      <button onclick="openModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+        + Nova Task
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- BOARD -->
+<main class="max-w-7xl mx-auto px-4 py-6">
+  <div class="grid grid-cols-1 md:grid-cols-4 gap-5">
+
+    <!-- TODO -->
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-3 border-b-2 border-slate-200 bg-slate-50">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full status-dot-todo"></span>
+          <h2 class="font-semibold text-slate-700 text-sm uppercase tracking-wide">To Do</h2>
+          <span id="count-todo" class="text-xs bg-slate-200 text-slate-600 rounded-full px-2 py-0.5">0</span>
+        </div>
+        <button onclick="openModal('todo')" class="text-slate-400 hover:text-indigo-600 text-xl leading-none" title="Adicionar">+</button>
+      </div>
+      <div class="column-scroll p-3">
+        <div id="list-todo" class="task-list space-y-2 min-h-8" data-status="todo"></div>
+      </div>
+    </div>
+
+    <!-- DOING -->
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-3 border-b-2 border-amber-300 bg-amber-50">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full status-dot-doing"></span>
+          <h2 class="font-semibold text-amber-700 text-sm uppercase tracking-wide">Doing</h2>
+          <span id="count-doing" class="text-xs bg-amber-200 text-amber-700 rounded-full px-2 py-0.5">0</span>
+        </div>
+        <button onclick="openModal('doing')" class="text-amber-400 hover:text-indigo-600 text-xl leading-none" title="Adicionar">+</button>
+      </div>
+      <div class="column-scroll p-3">
+        <div id="list-doing" class="task-list space-y-2 min-h-8" data-status="doing"></div>
+      </div>
+    </div>
+
+    <!-- WAITING THIRDPARTIES -->
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-3 border-b-2 border-purple-300 bg-purple-50">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full status-dot-waiting"></span>
+          <h2 class="font-semibold text-purple-700 text-sm uppercase tracking-wide">Waiting Thirdparties</h2>
+          <span id="count-waiting" class="text-xs bg-purple-200 text-purple-700 rounded-full px-2 py-0.5">0</span>
+        </div>
+        <button onclick="openModal('waiting')" class="text-purple-400 hover:text-indigo-600 text-xl leading-none" title="Adicionar">+</button>
+      </div>
+      <div class="column-scroll p-3">
+        <div id="list-waiting" class="task-list space-y-2 min-h-8" data-status="waiting"></div>
+      </div>
+    </div>
+
+    <!-- DONE -->
+    <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div class="flex items-center justify-between px-4 py-3 border-b-2 border-green-300 bg-green-50">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full status-dot-done"></span>
+          <h2 class="font-semibold text-green-700 text-sm uppercase tracking-wide">Done</h2>
+          <span id="count-done" class="text-xs bg-green-200 text-green-700 rounded-full px-2 py-0.5">0</span>
+        </div>
+        <button onclick="openModal('done')" class="text-green-400 hover:text-indigo-600 text-xl leading-none" title="Adicionar">+</button>
+      </div>
+      <div class="column-scroll p-3">
+        <div id="list-done" class="task-list space-y-2 min-h-8" data-status="done"></div>
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- MODAL ADD/EDIT TASK -->
+<div id="modal" class="hidden fixed inset-0 z-50 modal-backdrop flex items-end md:items-center justify-center p-0 md:p-4">
+  <div class="bg-white w-full md:max-w-lg md:rounded-2xl rounded-t-2xl shadow-2xl overflow-hidden">
+    <div class="flex items-center justify-between px-5 py-4 border-b">
+      <h3 id="modal-title" class="font-semibold text-slate-800 text-base">Nova Task</h3>
+      <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 text-2xl leading-none">&times;</button>
+    </div>
+    <div class="px-5 py-4 space-y-4 max-h-[80vh] overflow-y-auto">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Título *</label>
+        <input id="f-title" type="text" placeholder="O que precisa ser feito?" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
+        <textarea id="f-desc" rows="2" placeholder="Detalhes opcionais..." class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-2">Status</label>
+        <div class="grid grid-cols-2 gap-2">
+          <label>
+            <input type="radio" name="f-status" value="todo" class="sr-only" />
+            <span class="status-btn block text-center text-xs font-medium py-2 rounded-lg border-2 cursor-pointer transition-all" data-val="todo">To Do</span>
+          </label>
+          <label>
+            <input type="radio" name="f-status" value="doing" class="sr-only" />
+            <span class="status-btn block text-center text-xs font-medium py-2 rounded-lg border-2 cursor-pointer transition-all" data-val="doing">Doing</span>
+          </label>
+          <label>
+            <input type="radio" name="f-status" value="waiting" class="sr-only" />
+            <span class="status-btn block text-center text-xs font-medium py-2 rounded-lg border-2 cursor-pointer transition-all" data-val="waiting">Waiting 3rd</span>
+          </label>
+          <label>
+            <input type="radio" name="f-status" value="done" class="sr-only" />
+            <span class="status-btn block text-center text-xs font-medium py-2 rounded-lg border-2 cursor-pointer transition-all" data-val="done">Done</span>
+          </label>
+        </div>
+      </div>
+      <div class="flex gap-4">
+        <label class="flex items-center gap-2 cursor-pointer select-none">
+          <input id="f-urgent" type="checkbox" class="w-4 h-4 rounded" />
+          <span class="text-sm font-medium text-red-600">🔴 Urgente</span>
+        </label>
+        <label class="flex items-center gap-2 cursor-pointer select-none">
+          <input id="f-important" type="checkbox" class="w-4 h-4 rounded" />
+          <span class="text-sm font-medium text-amber-600">⭐ Importante</span>
+        </label>
+      </div>
+
+      <!-- SUBTASKS (only in edit mode) -->
+      <div id="subtask-section" class="hidden">
+        <div class="flex items-center justify-between mb-2">
+          <label class="block text-sm font-medium text-slate-700">Subtasks</label>
+          <button onclick="openSubtaskAdd()" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">+ Adicionar</button>
+        </div>
+        <div id="subtask-list" class="space-y-1.5"></div>
+        <div id="subtask-add-form" class="hidden mt-2 flex gap-2">
+          <input id="f-sub-title" type="text" placeholder="Título da subtask" class="flex-1 border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          <button onclick="saveSubtask()" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium">OK</button>
+        </div>
+      </div>
+    </div>
+    <div class="px-5 py-4 border-t flex gap-3">
+      <button onclick="closeModal()" class="flex-1 border border-slate-300 text-slate-700 py-2 rounded-lg text-sm font-medium hover:bg-slate-50">Cancelar</button>
+      <button onclick="saveTask()" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg text-sm font-medium transition-colors">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE -->
+<div id="confirm-modal" class="hidden fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full">
+    <h3 class="font-semibold text-slate-800 mb-2">Deletar task?</h3>
+    <p class="text-sm text-slate-500 mb-5">Isso também vai remover todas as subtasks.</p>
+    <div class="flex gap-3">
+      <button onclick="closeConfirm()" class="flex-1 border border-slate-300 py-2 rounded-lg text-sm font-medium">Cancelar</button>
+      <button id="confirm-ok" class="flex-1 bg-red-600 text-white py-2 rounded-lg text-sm font-medium">Deletar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let tasks = [];
+let editingTaskId = null;
+let defaultStatus = 'todo';
+let expandedSubs = new Set();
+
+// ─── API ──────────────────────────────────────────────────────────────────────
+const api = {
+  async get() {
+    const r = await fetch('/api/tasks');
+    return r.json();
+  },
+  async create(data) {
+    const r = await fetch('/api/tasks', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    return r.json();
+  },
+  async update(id, data) {
+    const r = await fetch(`/api/tasks/${id}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) });
+    return r.json();
+  },
+  async delete(id) {
+    await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+  },
+  async reorder(items) {
+    await fetch('/api/tasks/reorder', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(items) });
+  }
+};
+
+// ─── LOAD & RENDER ────────────────────────────────────────────────────────────
+async function loadTasks() {
+  tasks = await api.get();
+  renderBoard();
+}
+
+function renderBoard() {
+  const statuses = ['todo', 'doing', 'waiting', 'done'];
+  for (const st of statuses) {
+    const list = document.getElementById(`list-${st}`);
+    const group = tasks.filter(t => t.status === st);
+    list.innerHTML = group.map(t => taskCardHTML(t)).join('');
+    document.getElementById(`count-${st}`).textContent = group.length;
+  }
+  bindCardEvents();
+  initSortable();
+  expandedSubs.forEach(id => {
+    const el = document.getElementById(`subs-${id}`);
+    const chevron = document.getElementById(`sub-chevron-${id}`);
+    if (el) { el.classList.remove('hidden'); chevron?.classList.add('rotate-90'); }
+  });
+}
+
+function taskCardHTML(task) {
+  const flags = (task.is_urgent ? '🔴' : '') + (task.is_important ? '⭐' : '');
+
+  const subs = task.subtasks || [];
+  const doneSubs = subs.filter(s => s.status === 'done').length;
+
+  const desc = task.description
+    ? `<p class="text-xs text-slate-400 mt-1 line-clamp-1">${escHtml(task.description)}</p>`
+    : '';
+
+  const subSection = subs.length ? `
+    <div class="mt-1.5">
+      <button class="sub-toggle-btn text-xs text-slate-400 hover:text-indigo-500 flex items-center gap-1"
+              onclick="event.stopPropagation(); toggleSubtasks(${task.id})">
+        <svg id="sub-chevron-${task.id}" class="w-3 h-3 transition-transform duration-150 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+        </svg>
+        <span id="sub-count-${task.id}">${doneSubs}/${subs.length}</span>
+      </button>
+      <div id="subs-${task.id}" class="hidden mt-1 space-y-0.5 pl-1">
+        ${subs.map(s => `
+          <label class="flex items-center gap-1.5 py-0.5 cursor-pointer">
+            <input type="checkbox" class="sub-check w-3 h-3 rounded" data-id="${s.id}" data-task-id="${task.id}" ${s.status === 'done' ? 'checked' : ''} />
+            <span class="text-xs leading-tight ${s.status === 'done' ? 'line-through text-slate-400' : 'text-slate-600'}">${escHtml(s.title)}</span>
+          </label>`).join('')}
+      </div>
+    </div>` : '';
+
+  const statusActions = {
+    todo: `<button class="move-btn text-xs text-slate-400 hover:text-amber-600 transition-colors" data-id="${task.id}" data-to="doing">→ Doing</button>`,
+    doing: `<button class="move-btn text-xs text-slate-400 hover:text-slate-600 transition-colors" data-id="${task.id}" data-to="todo">← Todo</button>
+            <button class="move-btn text-xs text-slate-400 hover:text-purple-600 transition-colors" data-id="${task.id}" data-to="waiting">→ Waiting</button>`,
+    waiting: `<button class="move-btn text-xs text-slate-400 hover:text-amber-600 transition-colors" data-id="${task.id}" data-to="doing">← Doing</button>
+            <button class="move-btn text-xs text-slate-400 hover:text-green-600 transition-colors" data-id="${task.id}" data-to="done">→ Done</button>`,
+    done: `<button class="move-btn text-xs text-slate-400 hover:text-purple-600 transition-colors" data-id="${task.id}" data-to="waiting">← Waiting</button>`
+  }[task.status] || '';
+
+  return `
+    <div class="task-card bg-white border border-slate-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow"
+         data-id="${task.id}" data-status="${task.status}">
+      <div class="flex items-start justify-between gap-2">
+        <p class="text-sm font-medium text-slate-800 leading-snug flex-1">${flags ? `<span class="mr-0.5">${flags}</span>` : ''}${escHtml(task.title)}</p>
+        <div class="flex gap-1 shrink-0">
+          <button class="edit-btn p-1 text-slate-300 hover:text-indigo-500 transition-colors" data-id="${task.id}" title="Editar">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+          </button>
+          <button class="del-btn p-1 text-slate-300 hover:text-red-500 transition-colors" data-id="${task.id}" title="Deletar">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+          </button>
+        </div>
+      </div>
+      ${desc}${subSection}
+      <div class="flex items-center mt-2 pt-2 border-t border-slate-100">
+        <div class="flex gap-2">${statusActions}</div>
+      </div>
+    </div>
+  `;
+}
+
+function escHtml(str) {
+  return (str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function bindCardEvents() {
+  document.querySelectorAll('.edit-btn').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); openModal(null, parseInt(btn.dataset.id)); });
+  });
+  document.querySelectorAll('.del-btn').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); showConfirm(parseInt(btn.dataset.id)); });
+  });
+  document.querySelectorAll('.move-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      quickMove(parseInt(btn.dataset.id), btn.dataset.to);
+    });
+  });
+  document.querySelectorAll('.sub-check').forEach(cb => {
+    cb.addEventListener('change', async e => {
+      e.stopPropagation();
+      const subId = parseInt(cb.dataset.id);
+      const taskId = parseInt(cb.dataset.taskId);
+      const done = cb.checked;
+      api.update(subId, { status: done ? 'done' : 'todo' });
+      const task = tasks.find(t => t.id === taskId);
+      if (task) {
+        const sub = task.subtasks.find(s => s.id === subId);
+        if (sub) sub.status = done ? 'done' : 'todo';
+        const d = task.subtasks.filter(s => s.status === 'done').length;
+        const countEl = document.getElementById(`sub-count-${taskId}`);
+        if (countEl) countEl.textContent = `${d}/${task.subtasks.length}`;
+      }
+      const span = cb.closest('label')?.querySelector('span');
+      if (span) span.className = `text-xs leading-tight ${done ? 'line-through text-slate-400' : 'text-slate-600'}`;
+    });
+  });
+}
+
+function toggleSubtasks(taskId) {
+  const el = document.getElementById(`subs-${taskId}`);
+  const chevron = document.getElementById(`sub-chevron-${taskId}`);
+  if (el.classList.contains('hidden')) {
+    expandedSubs.add(taskId);
+    el.classList.remove('hidden');
+    chevron?.classList.add('rotate-90');
+  } else {
+    expandedSubs.delete(taskId);
+    el.classList.add('hidden');
+    chevron?.classList.remove('rotate-90');
+  }
+}
+
+async function autoOrder() {
+  const priority = t => (t.is_urgent && t.is_important) ? 0 : t.is_urgent ? 1 : t.is_important ? 2 : 3;
+
+  const payload = [];
+  for (const status of ['todo', 'doing', 'waiting', 'done']) {
+    const group = tasks.filter(t => t.status === status).sort((a, b) => priority(a) - priority(b));
+    group.forEach((t, idx) => payload.push({ id: t.id, order_index: idx * 1000, status }));
+  }
+
+  await api.reorder(payload);
+  await loadTasks();
+}
+
+async function quickMove(id, newStatus) {
+  await api.update(id, { status: newStatus });
+  await loadTasks();
+}
+
+// ─── SORTABLE ─────────────────────────────────────────────────────────────────
+let sortables = [];
+
+function initSortable() {
+  sortables.forEach(s => s.destroy());
+  sortables = [];
+
+  const lists = document.querySelectorAll('.task-list');
+  lists.forEach(el => {
+    const s = Sortable.create(el, {
+      group: 'tasks',
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      dragClass: 'sortable-drag',
+      onEnd: handleDragEnd
+    });
+    sortables.push(s);
+  });
+}
+
+async function handleDragEnd(evt) {
+  const newStatus = evt.to.dataset.status;
+
+  const reorderPayload = [];
+  document.querySelectorAll('.task-list').forEach(list => {
+    const colStatus = list.dataset.status;
+    [...list.children].forEach((card, idx) => {
+      reorderPayload.push({
+        id: parseInt(card.dataset.id),
+        order_index: idx * 1000,
+        status: colStatus
+      });
+    });
+  });
+
+  await api.reorder(reorderPayload);
+  const draggedId = parseInt(evt.item.dataset.id);
+  const task = tasks.find(t => t.id === draggedId);
+  if (task) task.status = newStatus;
+}
+
+// ─── MODAL ────────────────────────────────────────────────────────────────────
+function openModal(status = null, taskId = null) {
+  editingTaskId = taskId;
+  defaultStatus = status || 'todo';
+
+  const modal = document.getElementById('modal');
+  modal.classList.remove('hidden');
+
+  if (taskId) {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+    document.getElementById('modal-title').textContent = 'Editar Task';
+    document.getElementById('f-title').value = task.title;
+    document.getElementById('f-desc').value = task.description || '';
+    document.getElementById('f-urgent').checked = !!task.is_urgent;
+    document.getElementById('f-important').checked = !!task.is_important;
+    setStatusRadio(task.status);
+    renderSubtasks(task);
+    document.getElementById('subtask-section').classList.remove('hidden');
+  } else {
+    document.getElementById('modal-title').textContent = 'Nova Task';
+    document.getElementById('f-title').value = '';
+    document.getElementById('f-desc').value = '';
+    document.getElementById('f-urgent').checked = false;
+    document.getElementById('f-important').checked = false;
+    setStatusRadio(defaultStatus);
+    document.getElementById('subtask-section').classList.add('hidden');
+    document.getElementById('subtask-add-form').classList.add('hidden');
+  }
+
+  setTimeout(() => document.getElementById('f-title').focus(), 50);
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.add('hidden');
+  editingTaskId = null;
+}
+
+function setStatusRadio(val) {
+  document.querySelectorAll('input[name="f-status"]').forEach(r => {
+    r.checked = r.value === val;
+  });
+  updateStatusBtns();
+}
+
+function updateStatusBtns() {
+  const selected = document.querySelector('input[name="f-status"]:checked')?.value;
+  document.querySelectorAll('.status-btn').forEach(btn => {
+    const v = btn.dataset.val;
+    btn.className = 'status-btn block text-center text-xs font-medium py-2 rounded-lg border-2 cursor-pointer transition-all ' +
+      (v === selected
+        ? statusBtnActive(v)
+        : 'border-slate-200 text-slate-400 bg-white hover:border-slate-300');
+  });
+}
+
+function statusBtnActive(v) {
+  return {
+    todo: 'border-slate-500 bg-slate-100 text-slate-700',
+    doing: 'border-amber-400 bg-amber-50 text-amber-700',
+    waiting: 'border-purple-400 bg-purple-50 text-purple-700',
+    done: 'border-green-400 bg-green-50 text-green-700'
+  }[v] || '';
+}
+
+document.querySelectorAll('input[name="f-status"]').forEach(r => {
+  r.addEventListener('change', updateStatusBtns);
+});
+document.querySelectorAll('.status-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const radio = btn.closest('label').querySelector('input');
+    radio.checked = true;
+    updateStatusBtns();
+  });
+});
+
+updateStatusBtns();
+
+async function saveTask() {
+  const title = document.getElementById('f-title').value.trim();
+  if (!title) { document.getElementById('f-title').focus(); return; }
+
+  const status = document.querySelector('input[name="f-status"]:checked')?.value || 'todo';
+  const data = {
+    title,
+    description: document.getElementById('f-desc').value.trim(),
+    status,
+    is_urgent: document.getElementById('f-urgent').checked,
+    is_important: document.getElementById('f-important').checked,
+  };
+
+  if (editingTaskId) {
+    await api.update(editingTaskId, data);
+  } else {
+    await api.create(data);
+  }
+
+  closeModal();
+  await loadTasks();
+}
+
+// ─── SUBTASKS ─────────────────────────────────────────────────────────────────
+function renderSubtasks(task) {
+  const subs = task.subtasks || [];
+  const container = document.getElementById('subtask-list');
+  if (!subs.length) { container.innerHTML = '<p class="text-xs text-slate-400 italic">Nenhuma subtask</p>'; return; }
+
+  container.innerHTML = subs.map(s => `
+    <div class="flex items-center gap-2 group">
+      <input type="checkbox" class="sub-check w-3.5 h-3.5 rounded" data-id="${s.id}" ${s.status === 'done' ? 'checked' : ''} />
+      <span class="text-sm flex-1 ${s.status === 'done' ? 'line-through text-slate-400' : 'text-slate-700'}">${escHtml(s.title)}</span>
+      <button class="del-sub-btn opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all" data-id="${s.id}">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+  `).join('');
+
+  container.querySelectorAll('.sub-check').forEach(cb => {
+    cb.addEventListener('change', async () => {
+      await api.update(parseInt(cb.dataset.id), { status: cb.checked ? 'done' : 'todo' });
+      const task = tasks.find(t => t.id === editingTaskId);
+      if (task) {
+        const sub = task.subtasks.find(s => s.id === parseInt(cb.dataset.id));
+        if (sub) sub.status = cb.checked ? 'done' : 'todo';
+        renderSubtasks(task);
+      }
+      await loadTasks();
+    });
+  });
+
+  container.querySelectorAll('.del-sub-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await api.delete(parseInt(btn.dataset.id));
+      const task = tasks.find(t => t.id === editingTaskId);
+      if (task) {
+        task.subtasks = task.subtasks.filter(s => s.id !== parseInt(btn.dataset.id));
+        renderSubtasks(task);
+      }
+      await loadTasks();
+    });
+  });
+}
+
+function openSubtaskAdd() {
+  const form = document.getElementById('subtask-add-form');
+  form.classList.toggle('hidden');
+  if (!form.classList.contains('hidden')) {
+    document.getElementById('f-sub-title').value = '';
+    document.getElementById('f-sub-title').focus();
+  }
+}
+
+async function saveSubtask() {
+  const title = document.getElementById('f-sub-title').value.trim();
+  if (!title || !editingTaskId) return;
+
+  const newSub = await api.create({ title, parent_id: editingTaskId, status: 'todo' });
+  const task = tasks.find(t => t.id === editingTaskId);
+  if (task) {
+    task.subtasks = task.subtasks || [];
+    task.subtasks.push(newSub);
+    renderSubtasks(task);
+  }
+  document.getElementById('subtask-add-form').classList.add('hidden');
+  await loadTasks();
+}
+
+document.getElementById('f-sub-title').addEventListener('keydown', e => {
+  if (e.key === 'Enter') saveSubtask();
+  if (e.key === 'Escape') document.getElementById('subtask-add-form').classList.add('hidden');
+});
+
+// ─── CONFIRM DELETE ───────────────────────────────────────────────────────────
+let pendingDeleteId = null;
+
+function showConfirm(id) {
+  pendingDeleteId = id;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+}
+
+function closeConfirm() {
+  pendingDeleteId = null;
+  document.getElementById('confirm-modal').classList.add('hidden');
+}
+
+document.getElementById('confirm-ok').addEventListener('click', async () => {
+  if (pendingDeleteId) {
+    await api.delete(pendingDeleteId);
+    closeConfirm();
+    await loadTasks();
+  }
+});
+
+// ─── KEYBOARD ─────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    closeModal();
+    closeConfirm();
+  }
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    const modal = document.getElementById('modal');
+    if (!modal.classList.contains('hidden')) saveTask();
+  }
+  if (e.key === 'n' && !['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) {
+    openModal();
+  }
+});
+
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal')) closeModal();
+});
+
+document.getElementById('confirm-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('confirm-modal')) closeConfirm();
+});
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+loadTasks();
+</script>
+</body>
+</html>

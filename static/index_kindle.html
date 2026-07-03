@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quick Tasks</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Georgia, 'Times New Roman', serif; background: #f0f0f0; color: #111; font-size: 16px; line-height: 1.4; }
+
+    /* HEADER */
+    #header { background: #fff; border-bottom: 2px solid #333; padding: 10px 14px; overflow: hidden; }
+    #header h1 { font-size: 20px; float: left; line-height: 36px; }
+    #btn-add-main { float: right; background: #333; color: #fff; border: none; padding: 8px 16px; font-size: 14px; cursor: pointer; }
+
+    /* BOARD */
+    #board { padding: 10px; }
+    .columns-wrap { display: table; width: 100%; border-collapse: separate; border-spacing: 8px 0; }
+    .column { display: table-cell; width: 33.33%; vertical-align: top; background: #fff; border: 1px solid #bbb; }
+    .col-header { background: #e8e8e8; border-bottom: 2px solid #999; padding: 8px 10px; overflow: hidden; }
+    .col-header h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; float: left; line-height: 24px; }
+    .col-count { font-size: 11px; background: #ccc; padding: 1px 7px; margin-left: 5px; border-radius: 10px; }
+    .col-add-btn { float: right; background: none; border: 1px solid #aaa; font-size: 16px; cursor: pointer; padding: 1px 8px; line-height: 1.3; }
+    .col-tasks { padding: 8px; min-height: 60px; }
+
+    /* TASK CARD */
+    .task-card { border: 1px solid #ccc; background: #fff; padding: 10px; margin-bottom: 8px; }
+    .task-card.urgent-card { border-left: 4px solid #333; }
+    .task-title { font-size: 14px; font-weight: bold; margin-bottom: 4px; }
+    .task-desc { font-size: 12px; color: #555; margin-bottom: 6px; }
+    .task-badges { margin-bottom: 6px; }
+    .badge { font-size: 11px; border: 1px solid #888; padding: 1px 6px; margin-right: 4px; }
+    .badge-urgent { font-weight: bold; }
+    .sub-progress { font-size: 11px; color: #666; float: right; }
+    .task-actions { border-top: 1px solid #eee; padding-top: 6px; margin-top: 6px; overflow: hidden; }
+    .task-actions button { font-size: 12px; background: none; border: 1px solid #ccc; padding: 5px 10px; margin-right: 4px; margin-bottom: 3px; cursor: pointer; }
+
+    /* MODAL */
+    #modal-overlay, #confirm-overlay {
+      display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.55); z-index: 100; overflow-y: auto;
+    }
+    .modal-box {
+      background: #fff; margin: 20px auto; max-width: 500px;
+      border: 1px solid #888; width: 95%;
+    }
+    .modal-header { background: #e8e8e8; border-bottom: 1px solid #ccc; padding: 10px 14px; overflow: hidden; }
+    .modal-header h3 { font-size: 16px; float: left; }
+    .modal-close { float: right; background: none; border: none; font-size: 24px; cursor: pointer; line-height: 1; }
+    .modal-body { padding: 14px; max-height: 70vh; overflow-y: auto; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 5px; }
+    .form-group input[type=text],
+    .form-group textarea {
+      width: 100%; border: 1px solid #bbb; padding: 8px 10px;
+      font-size: 14px; font-family: inherit;
+    }
+    .form-group textarea { resize: vertical; }
+
+    /* STATUS BUTTONS */
+    .status-options { display: table; width: 100%; border-collapse: separate; border-spacing: 5px; }
+    .status-option { display: table-cell; }
+    .status-option input[type=radio] { display: none; }
+    .status-label {
+      display: block; text-align: center; border: 2px solid #ccc;
+      padding: 8px 4px; font-size: 13px; cursor: pointer;
+    }
+    .status-label.sel-todo   { border-color: #333; background: #ddd; font-weight: bold; }
+    .status-label.sel-doing  { border-color: #555; background: #efefef; font-weight: bold; }
+    .status-label.sel-done   { border-color: #333; background: #d0d0d0; font-weight: bold; }
+
+    /* CHECKBOXES */
+    .check-row { margin-top: 4px; }
+    .check-row label { font-size: 14px; margin-right: 20px; cursor: pointer; }
+    .check-row input { margin-right: 5px; }
+
+    .modal-footer { border-top: 1px solid #ccc; padding: 12px 14px; }
+    .modal-footer button { padding: 9px 20px; font-size: 14px; cursor: pointer; border: 1px solid #999; margin-right: 8px; }
+    .btn-save   { background: #333; color: #fff; }
+    .btn-cancel { background: #fff; color: #333; }
+
+    /* SUBTASKS */
+    #subtask-section { margin-top: 12px; border-top: 1px solid #ddd; padding-top: 10px; }
+    .sub-row { display: table; width: 100%; margin-bottom: 7px; }
+    .sub-chk  { display: table-cell; width: 26px; vertical-align: middle; }
+    .sub-lbl  { display: table-cell; font-size: 13px; vertical-align: middle; }
+    .sub-del  { display: table-cell; width: 34px; text-align: right; vertical-align: middle; }
+    .sub-del button { background: none; border: none; font-size: 16px; cursor: pointer; color: #999; padding: 2px 4px; }
+    #subtask-add-form { display: none; margin-top: 8px; }
+    #subtask-add-form input { width: 72%; padding: 6px 9px; border: 1px solid #ccc; font-size: 13px; font-family: inherit; }
+    #subtask-add-form button { padding: 6px 12px; background: #333; color: #fff; border: none; cursor: pointer; font-size: 13px; }
+    .sub-add-link { font-size: 12px; background: none; border: 1px solid #bbb; padding: 3px 9px; cursor: pointer; float: right; }
+    .sub-section-head { overflow: hidden; margin-bottom: 7px; }
+    .sub-section-head strong { font-size: 13px; }
+
+    /* CONFIRM */
+    .confirm-box { background: #fff; margin: 80px auto; max-width: 340px; border: 1px solid #888; padding: 24px; text-align: center; width: 90%; }
+    .confirm-box h3 { font-size: 16px; margin-bottom: 8px; }
+    .confirm-box p  { font-size: 13px; color: #555; margin-bottom: 18px; }
+    .confirm-box button { padding: 9px 22px; font-size: 14px; cursor: pointer; margin: 0 5px; border: 1px solid #999; }
+    .btn-del-confirm { background: #333; color: #fff; }
+
+    @media (max-width: 580px) {
+      .columns-wrap { display: block; border-spacing: 0; }
+      .column { display: block; width: 100%; margin-bottom: 10px; }
+    }
+
+    /* MODO HORIZONTAL (Kindle de lado): 4 colunas verticais continuas.
+       Os cards fluem de cima p/ baixo na coluna 1, depois continuam na 2, etc.
+       Tudo cabe na largura (sem scroll horizontal) e cresce p/ baixo (scroll vertical). */
+    body.h-mode { overflow-x: hidden; }
+    body.h-mode #board { padding: 4px; }
+
+    /* o conteudo inteiro (headers + cards) flui em 4 colunas */
+    body.h-mode .columns-wrap {
+      display: block !important;
+      width: 100%;
+      border-spacing: 0;
+      -webkit-column-count: 4;
+      -moz-column-count: 4;
+      column-count: 4;
+      -webkit-column-gap: 6px;
+      -moz-column-gap: 6px;
+      column-gap: 6px;
+    }
+
+    /* as 3 caixas de status viram passagens transparentes (overflow visivel
+       para permitir que o conteudo se reparta entre as colunas) */
+    body.h-mode .column {
+      display: block !important;
+      width: auto !important;
+      max-width: none !important;
+      margin: 0;
+      border: 0;
+      background: none;
+      overflow: visible;
+    }
+    body.h-mode .col-tasks { padding: 4px 0; min-height: 0; overflow: visible; }
+
+    /* o cabecalho do status nao parte entre colunas (vira um rotulo no fluxo) */
+    body.h-mode .col-header {
+      -webkit-column-break-inside: avoid;
+      page-break-inside: avoid;
+      break-inside: avoid;
+      margin-top: 6px;
+    }
+
+    /* cada card = bloco de altura fixa (~5 linhas) e nunca parte entre colunas */
+    body.h-mode .task-card {
+      -webkit-column-break-inside: avoid;
+      page-break-inside: avoid;
+      break-inside: avoid;
+      float: none;
+      width: auto;
+      height: 7.5em;            /* ~5 linhas */
+      overflow: hidden;
+      box-sizing: border-box;
+      margin: 0 0 6px 0;
+      padding: 6px 8px;
+    }
+    body.h-mode .task-actions { border-top: 1px solid #eee; padding-top: 3px; margin-top: 3px; }
+    body.h-mode .task-actions button { padding: 2px 6px; margin-bottom: 2px; }
+    body.h-mode #btn-h-mode { background: #111; color: #fff; border-color: #111; }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <h1>Quick Tasks V2</h1>
+  <button id="btn-h-mode" onclick="toggleHMode()" style="float:right; background:#fff; color:#333; border:1px solid #999; padding:8px 12px; font-size:14px; cursor:pointer; margin-left:6px;">&#8645;</button>
+  <button id="btn-add-main" onclick="openModal(null, null)">+ Nova Task</button>
+</div>
+
+<div id="board">
+  <div class="columns-wrap">
+
+    <div class="column">
+      <div class="col-header">
+        <h2>To Do</h2>
+        <span id="count-todo" class="col-count">0</span>
+        <button class="col-add-btn" onclick="openModal('todo', null)" title="Adicionar">+</button>
+      </div>
+      <div class="col-tasks" id="list-todo" data-status="todo"></div>
+    </div>
+
+    <div class="column">
+      <div class="col-header">
+        <h2>Doing</h2>
+        <span id="count-doing" class="col-count">0</span>
+        <button class="col-add-btn" onclick="openModal('doing', null)" title="Adicionar">+</button>
+      </div>
+      <div class="col-tasks" id="list-doing" data-status="doing"></div>
+    </div>
+
+    <div class="column">
+      <div class="col-header">
+        <h2>Done</h2>
+        <span id="count-done" class="col-count">0</span>
+        <button class="col-add-btn" onclick="openModal('done', null)" title="Adicionar">+</button>
+      </div>
+      <div class="col-tasks" id="list-done" data-status="done"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL ADD/EDIT -->
+<div id="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modal-title">Nova Task</h3>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="f-title">Titulo *</label>
+        <input id="f-title" type="text" placeholder="O que precisa ser feito?" />
+      </div>
+      <div class="form-group">
+        <label for="f-desc">Descricao</label>
+        <textarea id="f-desc" rows="3" placeholder="Detalhes opcionais..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <div class="status-options">
+          <div class="status-option">
+            <input type="radio" name="f-status" id="st-todo" value="todo" />
+            <label class="status-label" for="st-todo" data-val="todo" onclick="setStatus('todo')">To Do</label>
+          </div>
+          <div class="status-option">
+            <input type="radio" name="f-status" id="st-doing" value="doing" />
+            <label class="status-label" for="st-doing" data-val="doing" onclick="setStatus('doing')">Doing</label>
+          </div>
+          <div class="status-option">
+            <input type="radio" name="f-status" id="st-done" value="done" />
+            <label class="status-label" for="st-done" data-val="done" onclick="setStatus('done')">Done</label>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="check-row">
+          <label><input id="f-urgent" type="checkbox" /> Urgente</label>
+          <label><input id="f-important" type="checkbox" /> Importante</label>
+        </div>
+      </div>
+
+      <div id="subtask-section" style="display:none">
+        <div class="sub-section-head">
+          <strong>Subtasks</strong>
+          <button class="sub-add-link" onclick="openSubtaskAdd()">+ Adicionar</button>
+        </div>
+        <div id="subtask-list"></div>
+        <div id="subtask-add-form">
+          <input id="f-sub-title" type="text" placeholder="Titulo da subtask" />
+          <button onclick="saveSubtask()">OK</button>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-save" onclick="saveTask()">Salvar</button>
+      <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE -->
+<div id="confirm-overlay">
+  <div class="confirm-box">
+    <h3>Deletar task?</h3>
+    <p>Isso tambem vai remover todas as subtasks.</p>
+    <button class="btn-del-confirm" id="confirm-ok">Deletar</button>
+    <button onclick="closeConfirm()">Cancelar</button>
+  </div>
+</div>
+
+<script>
+var tasks = [];
+var editingTaskId = null;
+var defaultStatus = 'todo';
+var currentStatus = 'todo';
+var pendingDeleteId = null;
+
+// ─── HTTP ─────────────────────────────────────────────────────────────────────
+function httpRequest(method, url, data, callback) {
+  var xhr = new XMLHttpRequest();
+  xhr.open(method, url, true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.onreadystatechange = function() {
+    if (xhr.readyState !== 4) return;
+    if (xhr.status >= 200 && xhr.status < 300) {
+      var result = null;
+      if (xhr.responseText) {
+        try { result = JSON.parse(xhr.responseText); } catch(e) {}
+      }
+      callback(null, result);
+    } else {
+      callback(new Error('HTTP ' + xhr.status));
+    }
+  };
+  xhr.send(data !== undefined && data !== null ? JSON.stringify(data) : null);
+}
+
+// ─── API ──────────────────────────────────────────────────────────────────────
+var api = {
+  get: function(cb) { httpRequest('GET', '/api/tasks', null, cb); },
+  create: function(data, cb) { httpRequest('POST', '/api/tasks', data, cb); },
+  update: function(id, data, cb) { httpRequest('PUT', '/api/tasks/' + id, data, cb); },
+  del: function(id, cb) { httpRequest('DELETE', '/api/tasks/' + id, null, cb); }
+};
+
+// ─── RENDER ───────────────────────────────────────────────────────────────────
+function loadTasks() {
+  api.get(function(err, data) {
+    if (!err && data) { tasks = data; renderBoard(); }
+  });
+}
+
+function escHtml(str) {
+  return (str || '')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+function renderBoard() {
+  var statuses = ['todo', 'doing', 'done'];
+  var i, j, st, list, group, html;
+  for (i = 0; i < statuses.length; i++) {
+    st = statuses[i];
+    list = document.getElementById('list-' + st);
+    group = [];
+    for (j = 0; j < tasks.length; j++) {
+      if (tasks[j].status === st) group.push(tasks[j]);
+    }
+    html = '';
+    for (j = 0; j < group.length; j++) html += taskCardHTML(group[j]);
+    list.innerHTML = html;
+    document.getElementById('count-' + st).textContent = String(group.length);
+  }
+  bindCardEvents();
+}
+
+function taskCardHTML(task) {
+  var i, subs, doneSubs, badges, subProg, desc, moves, cls, html;
+
+  subs = task.subtasks || [];
+  doneSubs = 0;
+  for (i = 0; i < subs.length; i++) { if (subs[i].status === 'done') doneSubs++; }
+
+  badges = '';
+  if (task.is_urgent)    badges += '<span class="badge badge-urgent">[URGENTE]</span>';
+  if (task.is_important) badges += '<span class="badge">[IMPORTANTE]</span>';
+
+  subProg = subs.length ? '<span class="sub-progress">Sub: ' + doneSubs + '/' + subs.length + '</span>' : '';
+  desc    = task.description ? '<p class="task-desc">' + escHtml(task.description) + '</p>' : '';
+
+  moves = '';
+  if (task.status === 'todo') {
+    moves = '<button class="move-btn" data-id="' + task.id + '" data-to="doing">-&gt; Doing</button>';
+  } else if (task.status === 'doing') {
+    moves = '<button class="move-btn" data-id="' + task.id + '" data-to="todo">&lt;- Todo</button>' +
+            '<button class="move-btn" data-id="' + task.id + '" data-to="done">-&gt; Done</button>';
+  } else {
+    moves = '<button class="move-btn" data-id="' + task.id + '" data-to="doing">&lt;- Doing</button>';
+  }
+
+  cls = 'task-card' + (task.is_urgent ? ' urgent-card' : '');
+
+  html = '<div class="' + cls + '" data-id="' + task.id + '">' +
+    '<div class="task-title">' + escHtml(task.title) + '</div>' +
+    desc +
+    (badges ? '<div class="task-badges">' + badges + '</div>' : '') +
+    '<div class="task-actions">' +
+      moves +
+      '<button class="btn-edit" data-id="' + task.id + '">Editar</button>' +
+      '<button class="btn-del"  data-id="' + task.id + '">Deletar</button>' +
+      subProg +
+    '</div>' +
+  '</div>';
+
+  return html;
+}
+
+function bindCardEvents() {
+  var btns, i;
+
+  btns = document.querySelectorAll('.btn-edit');
+  for (i = 0; i < btns.length; i++) {
+    (function(btn) {
+      btn.onclick = function(e) { e.stopPropagation(); openModal(null, parseInt(btn.getAttribute('data-id'), 10)); };
+    })(btns[i]);
+  }
+
+  btns = document.querySelectorAll('.btn-del');
+  for (i = 0; i < btns.length; i++) {
+    (function(btn) {
+      btn.onclick = function(e) { e.stopPropagation(); showConfirm(parseInt(btn.getAttribute('data-id'), 10)); };
+    })(btns[i]);
+  }
+
+  btns = document.querySelectorAll('.move-btn');
+  for (i = 0; i < btns.length; i++) {
+    (function(btn) {
+      btn.onclick = function(e) {
+        e.stopPropagation();
+        quickMove(parseInt(btn.getAttribute('data-id'), 10), btn.getAttribute('data-to'));
+      };
+    })(btns[i]);
+  }
+}
+
+function quickMove(id, newStatus) {
+  api.update(id, {status: newStatus}, function(err) { if (!err) loadTasks(); });
+}
+
+// ─── MODAL ────────────────────────────────────────────────────────────────────
+function openModal(status, taskId) {
+  var i, task;
+  editingTaskId = taskId || null;
+  defaultStatus = status || 'todo';
+
+  document.getElementById('modal-overlay').style.display = 'block';
+
+  if (taskId) {
+    task = null;
+    for (i = 0; i < tasks.length; i++) { if (tasks[i].id === taskId) { task = tasks[i]; break; } }
+    if (!task) return;
+
+    document.getElementById('modal-title').textContent = 'Editar Task';
+    document.getElementById('f-title').value    = task.title;
+    document.getElementById('f-desc').value     = task.description || '';
+    document.getElementById('f-urgent').checked = !!task.is_urgent;
+    document.getElementById('f-important').checked = !!task.is_important;
+    setStatus(task.status);
+    document.getElementById('subtask-section').style.display = 'block';
+    renderSubtasks(task);
+  } else {
+    document.getElementById('modal-title').textContent = 'Nova Task';
+    document.getElementById('f-title').value    = '';
+    document.getElementById('f-desc').value     = '';
+    document.getElementById('f-urgent').checked = false;
+    document.getElementById('f-important').checked = false;
+    setStatus(defaultStatus);
+    document.getElementById('subtask-section').style.display = 'none';
+    document.getElementById('subtask-add-form').style.display = 'none';
+  }
+
+  try { document.getElementById('f-title').focus(); } catch(e) {}
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').style.display = 'none';
+  editingTaskId = null;
+}
+
+function setStatus(val) {
+  var i, labels, lbl;
+  currentStatus = val;
+  labels = document.querySelectorAll('.status-label');
+  for (i = 0; i < labels.length; i++) {
+    lbl = labels[i];
+    lbl.className = 'status-label' + (lbl.getAttribute('data-val') === val ? ' sel-' + val : '');
+  }
+  var radios = document.querySelectorAll('input[name="f-status"]');
+  for (i = 0; i < radios.length; i++) radios[i].checked = (radios[i].value === val);
+}
+
+function saveTask() {
+  var title  = document.getElementById('f-title').value.trim();
+  var desc   = document.getElementById('f-desc').value.trim();
+  var status = currentStatus || 'todo';
+
+  if (!title) { try { document.getElementById('f-title').focus(); } catch(e) {} return; }
+
+  var data = {
+    title: title,
+    description: desc,
+    status: status,
+    is_urgent: document.getElementById('f-urgent').checked,
+    is_important: document.getElementById('f-important').checked
+  };
+
+  if (editingTaskId) {
+    api.update(editingTaskId, data, function(err) { if (!err) { closeModal(); loadTasks(); } });
+  } else {
+    api.create(data, function(err) { if (!err) { closeModal(); loadTasks(); } });
+  }
+}
+
+// ─── SUBTASKS ─────────────────────────────────────────────────────────────────
+function renderSubtasks(task) {
+  var i, s, subs, html, container, checks, delBtns;
+  subs = task.subtasks || [];
+  container = document.getElementById('subtask-list');
+
+  if (!subs.length) {
+    container.innerHTML = '<p style="font-size:12px;color:#888;font-style:italic">Nenhuma subtask</p>';
+    return;
+  }
+
+  html = '';
+  for (i = 0; i < subs.length; i++) {
+    s = subs[i];
+    html += '<div class="sub-row">' +
+      '<div class="sub-chk"><input type="checkbox" class="sub-check" data-id="' + s.id + '"' + (s.status === 'done' ? ' checked' : '') + ' /></div>' +
+      '<div class="sub-lbl"' + (s.status === 'done' ? ' style="text-decoration:line-through;color:#999"' : '') + '>' + escHtml(s.title) + '</div>' +
+      '<div class="sub-del"><button class="del-sub-btn" data-id="' + s.id + '">&times;</button></div>' +
+    '</div>';
+  }
+  container.innerHTML = html;
+
+  checks = container.querySelectorAll('.sub-check');
+  for (i = 0; i < checks.length; i++) {
+    (function(cb) {
+      cb.onchange = function() {
+        var newSt = cb.checked ? 'done' : 'todo';
+        var subId = parseInt(cb.getAttribute('data-id'), 10);
+        api.update(subId, {status: newSt}, function(err) {
+          if (!err) {
+            var j, k, t = null;
+            for (j = 0; j < tasks.length; j++) { if (tasks[j].id === editingTaskId) { t = tasks[j]; break; } }
+            if (t) {
+              for (k = 0; k < t.subtasks.length; k++) {
+                if (t.subtasks[k].id === subId) { t.subtasks[k].status = newSt; break; }
+              }
+              renderSubtasks(t);
+            }
+            loadTasks();
+          }
+        });
+      };
+    })(checks[i]);
+  }
+
+  delBtns = container.querySelectorAll('.del-sub-btn');
+  for (i = 0; i < delBtns.length; i++) {
+    (function(btn) {
+      btn.onclick = function() {
+        var subId = parseInt(btn.getAttribute('data-id'), 10);
+        api.del(subId, function(err) {
+          if (!err) {
+            var j, t = null, newSubs;
+            for (j = 0; j < tasks.length; j++) { if (tasks[j].id === editingTaskId) { t = tasks[j]; break; } }
+            if (t) {
+              newSubs = [];
+              for (j = 0; j < t.subtasks.length; j++) { if (t.subtasks[j].id !== subId) newSubs.push(t.subtasks[j]); }
+              t.subtasks = newSubs;
+              renderSubtasks(t);
+            }
+            loadTasks();
+          }
+        });
+      };
+    })(delBtns[i]);
+  }
+}
+
+function openSubtaskAdd() {
+  var form = document.getElementById('subtask-add-form');
+  if (form.style.display === 'none' || form.style.display === '') {
+    form.style.display = 'block';
+    document.getElementById('f-sub-title').value = '';
+    try { document.getElementById('f-sub-title').focus(); } catch(e) {}
+  } else {
+    form.style.display = 'none';
+  }
+}
+
+function saveSubtask() {
+  var title = document.getElementById('f-sub-title').value.trim();
+  if (!title || !editingTaskId) return;
+
+  api.create({title: title, parent_id: editingTaskId, status: 'todo'}, function(err, newSub) {
+    if (!err && newSub) {
+      var i, t = null;
+      for (i = 0; i < tasks.length; i++) { if (tasks[i].id === editingTaskId) { t = tasks[i]; break; } }
+      if (t) {
+        if (!t.subtasks) t.subtasks = [];
+        t.subtasks.push(newSub);
+        renderSubtasks(t);
+      }
+      document.getElementById('subtask-add-form').style.display = 'none';
+      loadTasks();
+    }
+  });
+}
+
+document.getElementById('f-sub-title').onkeydown = function(e) {
+  var key = e.keyCode || e.which;
+  if (key === 13) saveSubtask();
+  if (key === 27) document.getElementById('subtask-add-form').style.display = 'none';
+};
+
+// ─── CONFIRM DELETE ───────────────────────────────────────────────────────────
+function showConfirm(id) {
+  pendingDeleteId = id;
+  document.getElementById('confirm-overlay').style.display = 'block';
+}
+
+function closeConfirm() {
+  pendingDeleteId = null;
+  document.getElementById('confirm-overlay').style.display = 'none';
+}
+
+document.getElementById('confirm-ok').onclick = function() {
+  if (pendingDeleteId) {
+    var id = pendingDeleteId;
+    api.del(id, function(err) { if (!err) { closeConfirm(); loadTasks(); } });
+  }
+};
+
+// ─── TECLADO ──────────────────────────────────────────────────────────────────
+document.onkeydown = function(e) {
+  if ((e.keyCode || e.which) === 27) { closeModal(); closeConfirm(); }
+};
+
+// ─── MODO HORIZONTAL ──────────────────────────────────────────────────────────
+// NAO usa classList (navegador do Kindle nao suporta) — manipula className como string.
+function hasHMode() {
+  return (' ' + document.body.className + ' ').indexOf(' h-mode ') !== -1;
+}
+function setHMode(on) {
+  var cls = document.body.className.replace(/\s*h-mode\s*/g, ' ');
+  cls = cls.replace(/^\s+|\s+$/g, '');
+  if (on) cls = (cls + ' h-mode').replace(/^\s+/, '');
+  document.body.className = cls;
+  try { localStorage.setItem('kindle-h-mode', on ? '1' : '0'); } catch(e) {}
+}
+function toggleHMode() {
+  setHMode(!hasHMode());
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+// Liga o modo horizontal por padrao; so desliga se o usuario explicitamente desligou.
+var hSaved = null;
+try { hSaved = localStorage.getItem('kindle-h-mode'); } catch(e) {}
+if (hSaved !== '0') setHMode(true);
+loadTasks();
+</script>
+</body>
+</html>

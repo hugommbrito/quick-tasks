@@ -1,0 +1,8 @@
+services:
+  quick-tasks:
+    build: .
+    ports:
+      - "8080:8000"
+    volumes:
+      - ./tasks.db:/app/tasks.db
+    restart: unless-stopped
