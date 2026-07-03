@@ -3,11 +3,12 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 from typing import Optional, List
+import os
 import sqlite3
 from datetime import datetime
 
 app = FastAPI()
-DB_PATH = "tasks.db"
+DB_PATH = os.environ.get("DB_PATH", "tasks.db")
 
 
 def get_db():
